@@ -54,7 +54,7 @@ Example:
 ```js
 module.exports = {
   BOT_NUMBER: '+YOUR_NUMBER_HERE',      // Replace with your bot WhatsApp number
-  OWNER_NUMBER: '+23279729810',         // Owner/support number
+  OWNER_NUMBER: '+2347046250568',         // Owner/support number
   MONGO_URI: 'mongodb+srv://<user>:<pass>@cluster/...', // if used
   SESSION: '',                          // session string or file location
   PORT: 3000
