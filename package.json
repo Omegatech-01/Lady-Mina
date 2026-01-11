@@ -49,7 +49,7 @@
     "node": ">=22.0.0"
   },
   "dependencies": {
-    "@itsukichan/baileys": "github:Itsukichann/Baileys",
+    "baileys": "github:Itsukichann/Baileys",
     "archiver": "^7.0.1",
     "awesome-phonenumber": "^7.6.0",
     "axios": "^1.13.2",
