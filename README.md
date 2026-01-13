@@ -98,7 +98,7 @@ pm2 startup
 
 🔐 Private Panel (Paid)
 
-Want the premium Cod3x? Contact Cod3x:
+Want the premium Panel? Contact Malvryx:
 👉 Chat with Dev Malvryx
 
 
@@ -134,6 +134,6 @@ Replace BOT_NUMBER in config.js with your number
 
 Star ⭐ this repo and Follow for next week’s full release
 
-Contact Cod3x for panel: Chat Malvryx 
+Contact Dev Malvryx for panel: Chat Malvryx 
 
 Owner: Support
