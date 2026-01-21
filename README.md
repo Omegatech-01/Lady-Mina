@@ -19,8 +19,8 @@ This repo is **half done** — the full release drops next week. Stay tuned.
 ## 📞 Contact & Support
 
 <p align="center">
-  <a href="https://wa.me/2348055714323?text=hi%20codex">
-    <img src="https://img.shields.io/badge/Chat%20with%20Cod3x-25D366?style=for-the-badge&logo=whatsapp&logoColor=white" />
+  <a href="https://wa.me/2348055714323?text=Hey%20Malvryx">
+    <img src="https://img.shields.io/badge/Chat%20with%20Dev%20Malvryx-25D366?style=for-the-badge&logo=whatsapp&logoColor=white" />
   </a>
   <a href="https://wa.me/23279729810">
     <img src="https://img.shields.io/badge/Owner%20Support-25D366?style=for-the-badge&logo=whatsapp&logoColor=white" />
@@ -98,8 +98,8 @@ pm2 startup
 
 🔐 Private Panel (Paid)
 
-Want the premium panel? Contact Cod3x:
-👉 Chat with Cod3x
+Want the premium Panel? Contact Malvryx:
+👉 Chat with Dev Malvryx
 
 
 ---
@@ -134,6 +134,6 @@ Replace BOT_NUMBER in config.js with your number
 
 Star ⭐ this repo and Follow for next week’s full release
 
-Contact Cod3x for panel: Chat Cod3x
+Contact Dev Malvryx for panel: Chat Malvryx 
 
 Owner: Support
