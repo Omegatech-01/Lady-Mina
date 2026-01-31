@@ -1,0 +1,88 @@
+{
+  "name": "Lady-Mina",
+  "version": "3.7.1",
+  "description": "Lady-Mina – Modern WhatsApp MD Bot. Copyright © 2024–2025 OmegaTech.",
+  "main": "index.js",
+  "type": "module",
+  "directories": {
+    "lib": "lib",
+    "plugins": "plugins"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "test": "node test.js"
+  },
+  "license": "Apache-2.0",
+  "author": {
+    "name": "Omega Tech",
+    "email": "Clord3076@gmail.com",
+    "url": "https://github.com/Omegatech-01"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Omegatech-01/Lady-Mina.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Omegatech-01/Lady-Mina/issues"
+  },
+  "homepage": "https://github.com/Omegatech-01/liora#readme",
+  "keywords": [
+    "whatsapp",
+    "Mina",
+    "bot"
+  ],
+  "funding": [
+    {
+      "type": "ko-fi",
+      "url": "https://ko-fi.com/naruyaizumi"
+    },
+    {
+      "type": "trakteer",
+      "url": "https://trakteer.id/naruyaizumi"
+    },
+    {
+      "type": "saweria",
+      "url": "https://saweria.co/naruyaizumi"
+    }
+  ],
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "dependencies": {
+    "baileys": "github:Itsukichann/Baileys",
+    "archiver": "^7.0.1",
+    "awesome-phonenumber": "^7.6.0",
+    "axios": "^1.13.2",
+    "axios-cookiejar-support": "^6.0.5",
+    "canvas": "^3.2.1",
+    "chalk": "^5.6.2",
+    "cheerio": "^1.1.2",
+    "chess.js": "^1.4.0",
+    "day-canvas": "^0.0.1",
+    "emoji-unicode": "^2.0.2",
+    "file-type": "^21.3.0",
+    "i": "^0.3.7",
+    "install": "^0.13.0",
+    "javascript-obfuscator": "^5.1.0",
+    "js-confuser": "^2.0.0",
+    "lowdb": "^7.0.1",
+    "mathjs": "^15.1.0",
+    "moment-timezone": "^0.6.0",
+    "node-cron": "^4.2.1",
+    "node-fetch": "^3.3.2",
+    "node-webpmux": "^3.2.1",
+    "npm": "^11.7.0",
+    "pdf-lib": "^1.17.1",
+    "pino": "^10.1.1",
+    "sharp": "^0.34.5",
+    "similarity": "^1.2.1",
+    "ssh2": "^1.17.0",
+    "syntax-error": "^1.4.0",
+    "tough-cookie": "^6.0.0",
+    "wa-sticker-formatter": "^4.4.4",
+    "wa-sticker-js": "^0.0.1",
+    "ws": "^8.19.0",
+    "yargs": "^18.0.0",
+    "yt-search": "^2.13.1"
+  }
+}
