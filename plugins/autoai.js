@@ -1,171 +1,110 @@
+import fetch from 'node-fetch'
 import fs from 'fs'
 import path from 'path'
-import fetch from 'node-fetch'
 
 const dbPath = path.join(process.cwd(), 'database', 'autoai_db.json')
+const API = 'https://api.omegatech.app/api/ai'
 
-if (!fs.existsSync(path.dirname(dbPath)))
-    fs.mkdirSync(path.dirname(dbPath), { recursive: true })
-
-if (!fs.existsSync(dbPath)) {
-    fs.writeFileSync(
-        dbPath,
-        JSON.stringify({
-            settings: {
-                global: {
-                    all: false,
-                    private: false,
-                    voice: true,
-                    defaultVoice: 'bella'
-                }
-            },
-            memory: {}
-        }, null, 2)
-    )
+function loadDb() {
+  try {
+    if (!fs.existsSync(path.dirname(dbPath))) fs.mkdirSync(path.dirname(dbPath), { recursive: true })
+    if (!fs.existsSync(dbPath)) {
+      const init = { settings: { global: { all: false, private: false, voice: false }, chats: {} }, voiceId: '' }
+      fs.writeFileSync(dbPath, JSON.stringify(init, null, 2))
+      return init
+    }
+    return JSON.parse(fs.readFileSync(dbPath, 'utf8'))
+  } catch {
+    return { settings: { global: { all: false, private: false, voice: false }, chats: {} }, voiceId: '' }
+  }
+}
+function saveDb(db) {
+  try { fs.writeFileSync(dbPath, JSON.stringify(db, null, 2)) } catch {}
 }
 
-const getDB = () => JSON.parse(fs.readFileSync(dbPath))
-const saveDB = (data) => fs.writeFileSync(dbPath, JSON.stringify(data, null, 2))
+const SYSTEM = `You are Mina (Lady-Mina). Friendly WhatsApp assistant for OmegaTech. Short, helpful, witty replies. Stay in character as Mina.`
 
-const systemPrompt =
-`You are Trisha. Not an AI. Real human. Sarcastic, witty, loyal to OmegaTech. Short human replies.`
-
-let VOICE_CACHE = null
-
-async function getVoices() {
-    if (VOICE_CACHE) return VOICE_CACHE
-    const res = await fetch('https://omegatech-api.dixonomega.tech/api/ai/text-to-speech?text=')
-    const json = await res.json()
-    VOICE_CACHE = json.voices || []
-    return VOICE_CACHE
+async function chatOmega(question) {
+  const url = `${API}/Omega?action=chat&prompt=${encodeURIComponent(SYSTEM + '\n\nUser: ' + question)}`
+  const res = await fetch(url, { headers: { 'User-Agent': 'Lady-Mina/1.0' } })
+  if (!res.ok) throw new Error('HTTP ' + res.status)
+  const json = await res.json()
+  return json?.result || json?.response || json?.message || json?.data?.reply || json?.data || null
 }
 
-async function resolveVoice(input) {
-    if (!input) return 'bella'
-    const voices = await getVoices()
-    const found =
-        voices.find(v => v.id === input) ||
-        voices.find(v => v.name.toLowerCase().includes(input.toLowerCase()))
-    return found ? found.id : 'bella'
+async function tts(text) {
+  const url = `${API}/text-to-speech?text=${encodeURIComponent(text.slice(0, 200))}`
+  const res = await fetch(url, { headers: { 'User-Agent': 'Lady-Mina/1.0' } })
+  if (!res.ok) return null
+  const json = await res.json()
+  return json?.result || json?.url || json?.audio || json?.data?.url || null
 }
 
 let handler = async (m, { conn, text, usedPrefix, command }) => {
-    let db = getDB()
-    let args = text ? text.split(' ') : []
-    let sub = args[0]?.toLowerCase()
-    let target = args[1]?.toLowerCase()
+  const db = loadDb()
+  const arg = (text || '').trim().toLowerCase()
+  const chatId = m.chat
 
-    if (sub === 'voice' && !target) {
-        let voices = await getVoices()
-        let list = `✨ *TRISHA VOICE ENGINE* ✨\n\n` +
-            voices.map(v => `🆔 \`${v.id}\`\n🗣️ ${v.name}`).join('\n\n')
-        return m.reply(list)
+  if (/^(on|off)/.test(arg)) {
+    const enable = arg.startsWith('on')
+    const target = arg.includes('/all') ? '/all' : arg.includes('/private') ? '/private' : arg.includes('/voice') ? '/voice' : 'chat'
+    if (target === '/all') db.settings.global.all = enable
+    else if (target === '/private') db.settings.global.private = enable
+    else if (target === '/voice') db.settings.global.voice = enable
+    else {
+      db.settings.chats[chatId] = db.settings.chats[chatId] || {}
+      db.settings.chats[chatId].enabled = enable
     }
+    saveDb(db)
+    return m.reply(`✅ *Mina* is now *${enable ? 'ENABLED' : 'DISABLED'}*${target === 'chat' ? ' for this chat' : ' (' + target + ')'}.`)
+  }
 
-    if (sub === 'set' && target === 'voice') {
-        let v = args[2]
-        if (!v) return m.reply(`Example: ${usedPrefix + command} set voice bella`)
-        db.settings.global.defaultVoice = v
-        saveDB(db)
-        return m.reply(`✅ Voice set to: *${v}*`)
-    }
-
-    if (sub === 'on' || sub === 'off') {
-        let enable = sub === 'on'
-        if (target === '/all') db.settings.global.all = enable
-        else if (target === '/private') db.settings.global.private = enable
-        else if (target === '/voice') db.settings.global.voice = enable
-        else {
-            if (!db.settings[m.chat]) db.settings[m.chat] = {}
-            db.settings[m.chat].enabled = enable
-        }
-        saveDB(db)
-        return m.reply(`✅ Trisha is now ${enable ? 'ENABLED' : 'DISABLED'} for this chat.`)
-    }
-
-    return m.reply(`✨ *TRISHA AUTO-AI* ✨\n\n• ${usedPrefix + command} on/off\n• ${usedPrefix + command} on/off /all\n• ${usedPrefix + command} on/off /private\n• ${usedPrefix + command} on/off /voice`)
+  return m.reply(`✨ *LADY-MINA AUTO-AI*\n\n• ${usedPrefix + command} on/off\n• ${usedPrefix + command} on/off /all\n• ${usedPrefix + command} on/off /private\n• ${usedPrefix + command} on/off /voice`)
 }
 
 handler.before = async (m, { conn }) => {
-    // 1. IMPROVED SELF-REPLY PROTECTION
-    if (!m.text || /^[.!#]/.test(m.text)) return
-    if (m.isBaileys) return // Prevents bot-to-bot loops
+  // Anti-lag: 3s per-chat cooldown
+  global._autoaiCd = global._autoaiCd || {}
+  const cdKey = m.chat
+  if (global._autoaiCd[cdKey] && Date.now() - global._autoaiCd[cdKey] < 3000) return
 
-    let db = getDB()
-    let g = db.settings.global
-    let c = db.settings[m.chat] || {}
+  if (!m.text || m.fromMe || m.isBaileys) return
+  if (/^[.#!\/]/.test(m.text.trim())) return // ignore commands
 
-    // 2. PRIORITY TOGGLE LOGIC (Fixes the OFF issue)
-    let shouldReply = false
-    let isPrivate = !m.isGroup
+  const db = loadDb()
+  const g = db.settings.global
+  const chat = db.settings.chats[m.chat] || {}
 
-    // Priority 1: If user turned it OFF manually in this specific chat, ALWAYS STAY OFF
-    if (c.enabled === false) {
-        shouldReply = false
-    } 
-    // Priority 2: If user turned it ON manually, stay ON
-    else if (c.enabled === true) {
-        shouldReply = true
-    } 
-    // Priority 3: Master switch
-    else if (g.all) {
-        shouldReply = true
-    } 
-    // Priority 4: Private DM global setting
-    else if (isPrivate && g.private) {
-        shouldReply = true
+  // Priority: per-chat override
+  if (chat.enabled === false) return
+  let active = chat.enabled === true
+  if (!active) {
+    if (g.all) active = true
+    else if (g.private && !m.isGroup) active = true
+  }
+  if (!active) return
+
+  global._autoaiCd[cdKey] = Date.now()
+  try {
+    const reply = await chatOmega(m.text)
+    if (!reply || typeof reply !== 'string') return
+    const clean = String(reply).trim()
+    if (!clean) return
+
+    if (g.voice) {
+      const audio = await tts(clean)
+      if (audio) {
+        await conn.sendMessage(m.chat, { audio: { url: audio }, mimetype: 'audio/mpeg', ptt: true }, { quoted: m })
+        return
+      }
     }
-
-    // 3. FIX FOR "MESSAGE YOURSELF" CHATS
-    // If it's a message to yourself, Baileys marks it as fromMe.
-    // We only reply if it's NOT a quote of the bot's own audio.
-    if (m.chat === m.sender && m.fromMe) {
-        // Only reply if there is no "quoted" message (meaning you typed it fresh)
-        if (m.quoted) return 
-    } else if (m.fromMe) {
-        return // Normal fromMe check for groups/other DMs
-    }
-
-    if (!shouldReply) return
-
-    try {
-        let q = encodeURIComponent(m.text)
-        let aiUrl = `https://omegatech-api.dixonomega.tech/api/ai/write-cream?question=${q}&logic=${encodeURIComponent(systemPrompt)}`
-
-        let aiRes = await fetch(aiUrl)
-        let aiJson = await aiRes.json()
-        let answer = aiJson.results
-        if (!answer) return
-
-        if (g.voice) {
-            await conn.sendPresenceUpdate('recording', m.chat)
-            let cleanText = answer.replace(/[^\w\s.,?!]/g, '').slice(0, 300)
-            let voiceId = await resolveVoice(g.defaultVoice)
-
-            let ttsUrl = `https://omegatech-api.dixonomega.tech/api/ai/text-to-speech?text=${encodeURIComponent(cleanText)}&voice=${voiceId}`
-            let ttsRes = await fetch(ttsUrl)
-            let ttsJson = await ttsRes.json()
-            
-            if (!ttsJson.result?.audio) return
-
-            let audioBuf = await (await fetch(ttsJson.result.audio)).buffer()
-
-            await conn.sendMessage(m.chat, {
-                audio: audioBuf,
-                mimetype: 'audio/mpeg',
-                ptt: false
-            }, { quoted: m })
-        } else {
-            await conn.sendPresenceUpdate('composing', m.chat)
-            await m.reply(answer)
-        }
-    } catch (e) {
-        console.error("Trisha Error:", e)
-    }
+    await m.reply(clean)
+  } catch (e) {
+    console.error('Mina AutoAI Error:', e)
+  }
 }
 
 handler.help = ['autoai']
 handler.tags = ['ai']
-handler.command = /^(autoai|trisha)$/i
-
+handler.command = /^(autoai|minaai)$/i
 export default handler
