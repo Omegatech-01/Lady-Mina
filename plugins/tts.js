@@ -1,108 +1,75 @@
-import axios from 'axios'
+import fetch from 'node-fetch'
 
-const IFRAME_URL = 'https://plachta-vits-umamusume-voice-synthesizer.hf.space'
+const API = 'https://api.omegatech.app/api/ai/Nicevoice'
 
-const CHAR_MAP = {
-  grass: '草上飞 Grass Wonder (Umamusume Pretty Derby)',
-  goldship: '黄金船 Gold Ship (Umamusume Pretty Derby)',
-  teio: '东海帝王 Tokai Teio (Umamusume Pretty Derby)',
-  raiden: '雷电将军 Raiden Shogun (Genshin Impact)',
-  hutao: '胡桃 Hu Tao (Genshin Impact)',
-  ayaka: '神里绫华 Kamisato Ayaka (Genshin Impact)',
-  paimon: '派蒙 Paimon (Genshin Impact)'
+async function api(params) {
+  const url = `${API}?${new URLSearchParams(params)}`
+  const res = await fetch(url, { headers: { 'User-Agent': 'Lady-Mina/1.0' } })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json()
 }
 
-const LANG_MAP = {
-  jp: '日本語',
-  en: 'English',
-  cn: '简体中文',
-  mix: 'Mix'
-}
+async function generateTTS(text, voice = 'friendly-women') {
+  const gen = await api({ action: 'generate', text: text.slice(0, 500), voice })
+  const taskSn = gen?.data?.taskSn || gen?.taskSn
+  if (!taskSn) throw new Error('No taskSn from Nicevoice')
 
-async function generateTTS(text, character, language) {
-  const session = Math.random().toString(36).slice(2)
-
-  await axios.post(`${IFRAME_URL}/gradio_api/queue/join`, {
-    data: [
-      text,
-      character,
-      language,
-      1.0,
-      false
-    ],
-    fn_index: 2,
-    session_hash: session,
-    trigger_id: 24
-  })
-
-  for (let i = 0; i < 60; i++) {
+  for (let i = 0; i < 20; i++) {
     await new Promise(r => setTimeout(r, 2000))
+    const st = await api({ action: 'result', taskSn })
+    const d = st?.data || st
+    if (d?.audioUrl && !d.pending) return d.audioUrl
+    if (d?.pending === false && !d.audioUrl) throw new Error('TTS failed')
+  }
+  throw new Error('TTS timeout')
+}
 
-    const res = await axios.get(
-      `${IFRAME_URL}/gradio_api/queue/data?session_hash=${session}`,
-      { responseType: 'text' }
-    )
-
-    const lines = res.data.split('\n')
-    for (const line of lines) {
-      if (!line.startsWith('data:')) continue
-      const json = JSON.parse(line.replace('data: ', ''))
-
-      if (json.msg === 'process_completed') {
-        for (const item of json.output.data) {
-          if (typeof item === 'string' && item.endsWith('.wav')) {
-            return `${IFRAME_URL}/gradio_api/file=${item}`
-          }
-        }
-      }
+let handler = async (m, { conn, text, usedPrefix, command, args }) => {
+  if (command === 'ttsvoices' || args[0] === 'list' || args[0] === 'voices') {
+    try {
+      const res = await api({ action: 'list' })
+      const voices = res?.data?.voices || []
+      let msg = '*🎙️ Nicevoice Voices*\n\n'
+      voices.slice(0, 40).forEach(v => {
+        msg += `• *${v.slug}* — ${v.name} (${v.gender || '?'})\n`
+      })
+      msg += `\nUse: ${usedPrefix}tts <voice> <text>\nOr: ${usedPrefix}tts <text> (default female)`
+      return m.reply(msg)
+    } catch (e) {
+      return m.reply('❌ Could not list voices: ' + (e.message || e))
     }
   }
 
-  throw 'TTS timeout'
-}
-
-const handler = async (m, { text, conn }) => {
   if (!text) {
-    return m.reply(
-`🧪 *Lady-Trish TTS*
-Usage:
-.tts <character>|<lang> <text>
-
-Example:
-.tts grass|jp Hello trainer
-.tts raiden|en I will protect you`
-    )
+    return m.reply(`*🎙️ Lady-Mina TTS (Nicevoice)*\n\n${usedPrefix}tts Hello Mina\n${usedPrefix}tts energetic-male Hello there\n${usedPrefix}ttsvoices — list voices\n\nAlso supports clone (advanced).`)
   }
 
-  const [meta, ...msg] = text.split(' ')
-  const [charKey, langKey] = meta.split('|')
-
-  const character = CHAR_MAP[charKey?.toLowerCase()] || CHAR_MAP.grass
-  const language = LANG_MAP[langKey?.toLowerCase()] || LANG_MAP.jp
-  const content = msg.join(' ')
-
-  m.react('🧪')
-
+  await m.react('🔊')
   try {
-    const audioUrl = await generateTTS(content, character, language)
-
-    await conn.sendMessage(
-      m.chat,
-      {
-        audio: { url: audioUrl },
-        mimetype: 'audio/wav',
-        ptt: true
-      },
-      { quoted: m }
-    )
+    // Optional first token as voice slug
+    let voice = 'friendly-women'
+    let say = text
+    const parts = text.trim().split(/\s+/)
+    if (parts.length > 1 && /^[a-z0-9-]+$/i.test(parts[0]) && parts[0].length < 40) {
+      voice = parts[0]
+      say = parts.slice(1).join(' ')
+    }
+    const audioUrl = await generateTTS(say, voice)
+    await conn.sendMessage(m.chat, {
+      audio: { url: audioUrl },
+      mimetype: 'audio/mpeg',
+      ptt: true
+    }, { quoted: m })
   } catch (e) {
-    console.error(e)
-    m.reply('❌ TTS generation failed')
+    m.reply('❌ TTS failed: ' + (e.message || e))
   }
 }
 
-handler.help = ['tts']
-handler.tags = ['ai']
-handler.command = /^tts|t2p| text2speech$/i
-
+handler.help = ['tts', 'ttsvoices']
+handler.tags = ['ai', 'tools']
+handler.command = /^(tts|ttsvoices|nicevoice)$/i
+handler.limit = true
 export default handler
+
+// Shared for autoai
+export { generateTTS }

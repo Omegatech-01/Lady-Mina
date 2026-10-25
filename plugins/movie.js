@@ -1,55 +1,92 @@
 import axios from 'axios'
 
-const API = 'https://api.omegatech.app/api/movie/lk21'
+const API = 'https://api.omegatech.app/api/movie/MovieBox-pro'
+const OFF = 'https://api.omegatech.app/api/movie/Moviebox_off'
 
 let handler = async (m, { conn, text, usedPrefix, command }) => {
-  if (!text) return m.reply(`*🎬 Lady-Mina Movie*\n\nExample:\n${usedPrefix + command} Avatar`)
+  if (!text) {
+    return m.reply(`*🎬 Lady-Mina MovieBox*\n\nSearch:\n${usedPrefix + command} Avatar\n\nReply with a number for stream links.`) 
+  }
+
+  conn.movieFlow = conn.movieFlow || {}
+
+  // Reply flow: pick result
+  if (m.quoted && conn.movieFlow[m.sender] && /^\d+$/.test(text.trim())) {
+    const list = conn.movieFlow[m.sender]
+    const item = list[parseInt(text) - 1]
+    if (!item) return m.reply('❌ Invalid number.')
+    await m.react('📥')
+    try {
+      const sid = item.subjectId
+      let streams = []
+      // Prefer search-provided proxies
+      if (item.proxyStream || item.proxyDownload) {
+        streams.push({ label: 'Stream (proxy)', url: item.proxyStream })
+        streams.push({ label: 'Download (proxy)', url: item.proxyDownload })
+      }
+      // Moviebox_off play
+      try {
+        const { data } = await axios.get(OFF, {
+          params: { action: 'play', subjectId: sid, season: item.season || 0, episode: 0 },
+          timeout: 25000,
+          headers: { 'User-Agent': 'Lady-Mina/1.0' }
+        })
+        const arr = data?.data?.streams || data?.streams || []
+        arr.forEach((s, i) => {
+          const u = s.trapUrl || s.url || s.hls || s.dash
+          if (u) streams.push({ label: s.resolutions || s.format || `Source ${i + 1}`, url: u })
+        })
+      } catch {}
+
+      let cap = `*🎬 ${item.title}*\n`
+      if (item.genre) cap += `🎭 ${item.genre}\n`
+      if (item.imdbRatingValue || item.imdb) cap += `⭐ ${item.imdbRatingValue || item.imdb}\n`
+      if (item.releaseDate) cap += `📅 ${item.releaseDate}\n`
+      cap += '\n'
+      if (streams.length) {
+        streams.slice(0, 12).forEach((s, i) => {
+          if (s.url) cap += `🔗 *${s.label || i + 1}*:\n${s.url}\n\n`
+        })
+      } else {
+        cap += '_No direct streams found. Try another title._'
+      }
+      delete conn.movieFlow[m.sender]
+      const cover = item.cover?.url || item.cover
+      if (cover) return conn.sendMessage(m.chat, { image: { url: cover }, caption: cap }, { quoted: m })
+      return m.reply(cap)
+    } catch (e) {
+      return m.reply('❌ Failed: ' + (e.message || e))
+    }
+  }
 
   await m.react('🔍')
   try {
     const { data } = await axios.get(API, {
-      params: { action: 'search', query: text },
+      params: { action: 'search', keyword: text },
       timeout: 25000,
       headers: { 'User-Agent': 'Lady-Mina/1.0' }
     })
-    const results = data?.results || data?.result || data?.data || []
-    const list = Array.isArray(results) ? results : []
-    if (!list.length) return m.reply('❌ No movies found.')
+    const results = data?.data?.results || data?.results || []
+    if (!results.length) return m.reply('❌ No movies found on MovieBox.')
 
-    const top = list.slice(0, 8)
-    let msg = `*🎬 Search:* ${text}\n\n`
+    const top = results.slice(0, 10)
+    conn.movieFlow[m.sender] = top
+
+    let msg = `*🎬 MovieBox Search:* ${text}\n\n`
     top.forEach((v, i) => {
-      msg += `*${i + 1}.* ${v.title || v.name || 'Untitled'}\n`
-      if (v.url || v.link) msg += `   ${v.url || v.link}\n`
+      const type = v.subjectType === 2 ? 'Series' : 'Movie'
+      msg += `*${i + 1}.* ${v.title} (${type})\n`
+      if (v.imdbRatingValue) msg += `   ⭐ ${v.imdbRatingValue} · ${v.releaseDate || ''}\n`
     })
-    msg += `\n_Open a link or refine your search._`
-
-    if (top.length === 1 && (top[0].url || top[0].link)) {
-      try {
-        const det = await axios.get(API, {
-          params: { action: 'full', query: text },
-          timeout: 30000
-        })
-        const d = det.data?.result || det.data?.data || det.data
-        const links = d?.downloads || d?.links || []
-        let cap = `*🎬 ${d?.title || top[0].title || text}*\n\n`
-        if (d?.synopsis) cap += d.synopsis.slice(0, 400) + '\n\n'
-        if (Array.isArray(links)) links.slice(0, 10).forEach((l, i) => {
-          cap += `🔗 ${l.quality || l.type || i + 1}: ${l.link || l.url || l}\n`
-        })
-        return m.reply(cap || msg)
-      } catch {
-        return m.reply(msg)
-      }
-    }
+    msg += `\n_Reply with a number for stream / download links._`
     return m.reply(msg)
   } catch (e) {
     m.reply('❌ Movie search failed: ' + (e.message || e))
   }
 }
 
-handler.help = ['movie']
+handler.help = ['movie', 'moviebox']
 handler.tags = ['downloader']
-handler.command = /^(movie|film|lk21)$/i
+handler.command = /^(movie|film|moviebox|mb)$/i
 handler.limit = true
 export default handler
