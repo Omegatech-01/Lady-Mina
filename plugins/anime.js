@@ -44,7 +44,7 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
         } else {
           delete conn.animeFlow[m.sender]
         }
-        const thumb = info.thumbnail || info.cover || info.image || item.image
+        const thumb = info.thumbnail || info.cover || info.image || item.thumbnail || item.image
         if (thumb) return conn.sendMessage(m.chat, { image: { url: thumb }, caption: cap }, { quoted: m })
         return m.reply(cap)
       } catch (e) {
@@ -81,8 +81,9 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
   await m.react('🔍')
   try {
     const res = await apiGet({ action: 'search', query: text })
-    const results = res.results || res.result || res.data || []
-    const list = Array.isArray(results) ? results : (results.result || [])
+    // Anoboy returns { result: { results: [...] } }
+    const results = res?.result?.results || res?.results || res?.result || res?.data || []
+    const list = Array.isArray(results) ? results : []
     if (!list.length) return m.reply('❌ Anime not found.')
 
     const top = list.slice(0, 10)
