@@ -36,7 +36,7 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
             if (!item) return m.reply('❌ Invalid choice. Pick a number from the list.');
             
             await m.react('⏳');
-            let res = await (await fetch(`https://omegatech-api.dixonomega.tech/api/Anime/anime-details?slug=${item.url}`)).json();
+            let res = await (await fetch(`https://api.omegatech.app/api/Anime/anime-details?slug=${item.url}`)).json();
             if (!res.status) return m.reply('❌ Details not found.');
 
             let cap = `*🎬 ${res.info.title}*\n\n` +
@@ -62,7 +62,7 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
             if (!ep) return m.reply('❌ Invalid episode number.');
             
             await m.react('📥');
-            let res = await (await fetch(`https://omegatech-api.dixonomega.tech/api/Anime/anime-download?slug=${ep.url}&quality=720p`)).json();
+            let res = await (await fetch(`https://api.omegatech.app/api/Anime/anime-download?slug=${ep.url}&quality=720p`)).json();
             
             let cap = `*🚀 DOWNLOAD READY*\n\n`;
             res.streams.forEach((s, i) => cap += `🔗 *Mirror ${i+1}:* ${s.link}\n\n`);
@@ -74,7 +74,7 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
 
     // --- CASE 3: NEW SEARCH ---
     await m.react('🔍');
-    let res = await (await fetch(`https://omegatech-api.dixonomega.tech/api/Anime/anime-search?query=${encodeURIComponent(text)}`)).json();
+    let res = await (await fetch(`https://api.omegatech.app/api/Anime/anime-search?query=${encodeURIComponent(text)}`)).json();
     if (!res.success || res.results.result.length === 0) return m.reply('❌ Anime not found.');
 
     let results = res.results.result.slice(0, 10);
