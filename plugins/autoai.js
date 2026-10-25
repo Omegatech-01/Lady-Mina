@@ -53,22 +53,30 @@ async function chatMina(question) {
   return null
 }
 
-/** Nicevoice TTS: generate → poll result */
 async function nicevoiceTTS(text, voice = 'friendly-women') {
   try {
     const genUrl = `${API}/Nicevoice?action=generate&text=${encodeURIComponent(text.slice(0, 400))}&voice=${encodeURIComponent(voice)}`
     const genRes = await fetch(genUrl, { headers: { 'User-Agent': 'Lady-Mina/1.0' } })
     const gen = await genRes.json()
-    const taskSn = gen?.data?.taskSn || gen?.taskSn
+    const d = gen?.data || gen
+    const taskSn = d?.taskSn
     if (!taskSn) return null
-    for (let i = 0; i < 15; i++) {
-      await new Promise(r => setTimeout(r, 2000))
-      const stRes = await fetch(`${API}/Nicevoice?action=result&taskSn=${encodeURIComponent(taskSn)}`, {
-        headers: { 'User-Agent': 'Lady-Mina/1.0' }
-      })
+    const account = d?.account
+    const token = d?.token
+    for (let i = 0; i < 20; i++) {
+      await new Promise(r => setTimeout(r, 2500))
+      let resultUrl = `${API}/Nicevoice?action=result&taskSn=${encodeURIComponent(taskSn)}`
+      if (account) resultUrl += `&account=${encodeURIComponent(account)}`
+      if (token) resultUrl += `&token=${encodeURIComponent(token)}`
+      const stRes = await fetch(resultUrl, { headers: { 'User-Agent': 'Lady-Mina/1.0' } })
       const st = await stRes.json()
-      const d = st?.data || st
-      if (d?.audioUrl && !d.pending) return d.audioUrl
+      const rd = st?.data || st
+      if (rd?.audioUrl && !rd.pending) {
+        // Download as buffer so chat never sees a URL
+        const aRes = await fetch(rd.audioUrl, { headers: { 'User-Agent': 'Lady-Mina/1.0' } })
+        if (!aRes.ok) return null
+        return Buffer.from(await aRes.arrayBuffer())
+      }
     }
   } catch (e) {
     console.error('Nicevoice TTS:', e.message)
@@ -95,7 +103,7 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
     return m.reply(`✅ *Mina* is now *${enable ? 'ENABLED' : 'DISABLED'}*${target === 'chat' ? ' for this chat' : ' (' + target + ')'}.`)
   }
 
-  return m.reply(`✨ *LADY-MINA AUTO-AI*\n\n• ${usedPrefix + command} on/off\n• ${usedPrefix + command} on/off /all\n• ${usedPrefix + command} on/off /private\n• ${usedPrefix + command} on/off /voice  _(Nicevoice TTS)_`)
+  return m.reply(`✨ *LADY-MINA AUTO-AI*\n\n• ${usedPrefix + command} on/off\n• ${usedPrefix + command} on/off /all\n• ${usedPrefix + command} on/off /private\n• ${usedPrefix + command} on/off /voice  _(Nicevoice PTT, no links)_`)
 }
 
 handler.before = async (m, { conn }) => {
@@ -127,9 +135,9 @@ handler.before = async (m, { conn }) => {
 
     if (g.voice) {
       const voice = db.voiceId || 'friendly-women'
-      const audio = await nicevoiceTTS(clean, voice)
-      if (audio) {
-        await conn.sendMessage(m.chat, { audio: { url: audio }, mimetype: 'audio/mpeg', ptt: true }, { quoted: m })
+      const audioBuf = await nicevoiceTTS(clean, voice)
+      if (audioBuf && Buffer.isBuffer(audioBuf)) {
+        await conn.sendMessage(m.chat, { audio: audioBuf, mimetype: 'audio/mpeg', ptt: true }, { quoted: m })
         return
       }
     }
