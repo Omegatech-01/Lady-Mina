@@ -22,22 +22,42 @@ function saveDb(db) {
   try { fs.writeFileSync(dbPath, JSON.stringify(db, null, 2)) } catch {}
 }
 
-const SYSTEM = `You are Mina (Lady-Mina). Friendly WhatsApp assistant for OmegaTech. Short, helpful, witty replies. Stay in character as Mina.`
+const SYSTEM = `You are Mina (Lady-Mina), a friendly WhatsApp assistant by OmegaTech. Keep replies short, helpful and witty. Stay in character as Mina.`
 
-async function chatOmega(question) {
-  const url = `${API}/Omega?action=chat&prompt=${encodeURIComponent(SYSTEM + '\n\nUser: ' + question)}`
-  const res = await fetch(url, { headers: { 'User-Agent': 'Lady-Mina/1.0' } })
-  if (!res.ok) throw new Error('HTTP ' + res.status)
-  const json = await res.json()
-  return json?.result || json?.response || json?.message || json?.data?.reply || json?.data || null
+async function chatMina(question) {
+  // Primary: Chatbot (stable)
+  try {
+    const url = `${API}/Chatbot?action=chat&message=${encodeURIComponent(SYSTEM + '\n\nUser: ' + question)}`
+    const res = await fetch(url, { headers: { 'User-Agent': 'Lady-Mina/1.0' }, timeout: 25000 })
+    if (res.ok) {
+      const json = await res.json()
+      const reply = json?.reply || json?.result || json?.response || json?.message || json?.data?.reply
+      if (reply && typeof reply === 'string' && reply.trim() && !/invalid request/i.test(reply)) return reply.trim()
+    }
+  } catch (e) {
+    console.error('Chatbot fail:', e.message)
+  }
+  // Fallback: All-Ai
+  try {
+    const url = `${API}/All-Ai?action=chat&message=${encodeURIComponent(question)}`
+    const res = await fetch(url, { headers: { 'User-Agent': 'Lady-Mina/1.0' }, timeout: 25000 })
+    if (res.ok) {
+      const json = await res.json()
+      let reply = json?.reply || json?.result || json?.response
+      if (typeof reply === 'string' && reply.startsWith('{')) {
+        try { reply = JSON.parse(reply)?.reply || reply } catch {}
+      }
+      if (reply && typeof reply === 'string' && reply.trim()) return reply.trim()
+    }
+  } catch (e) {
+    console.error('All-Ai fail:', e.message)
+  }
+  return null
 }
 
 async function tts(text) {
-  const url = `${API}/text-to-speech?text=${encodeURIComponent(text.slice(0, 200))}`
-  const res = await fetch(url, { headers: { 'User-Agent': 'Lady-Mina/1.0' } })
-  if (!res.ok) return null
-  const json = await res.json()
-  return json?.result || json?.url || json?.audio || json?.data?.url || null
+  // TTS currently unstable on OmegaTech; skip gracefully
+  return null
 }
 
 let handler = async (m, { conn, text, usedPrefix, command }) => {
@@ -63,7 +83,7 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
 }
 
 handler.before = async (m, { conn }) => {
-  // Anti-lag: 3s per-chat cooldown
+  // Anti-lag / anti-spam: 3s per-chat cooldown
   global._autoaiCd = global._autoaiCd || {}
   const cdKey = m.chat
   if (global._autoaiCd[cdKey] && Date.now() - global._autoaiCd[cdKey] < 3000) return
@@ -75,7 +95,6 @@ handler.before = async (m, { conn }) => {
   const g = db.settings.global
   const chat = db.settings.chats[m.chat] || {}
 
-  // Priority: per-chat override
   if (chat.enabled === false) return
   let active = chat.enabled === true
   if (!active) {
@@ -86,7 +105,7 @@ handler.before = async (m, { conn }) => {
 
   global._autoaiCd[cdKey] = Date.now()
   try {
-    const reply = await chatOmega(m.text)
+    const reply = await chatMina(m.text)
     if (!reply || typeof reply !== 'string') return
     const clean = String(reply).trim()
     if (!clean) return
