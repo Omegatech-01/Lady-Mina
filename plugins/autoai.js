@@ -9,13 +9,13 @@ function loadDb() {
   try {
     if (!fs.existsSync(path.dirname(dbPath))) fs.mkdirSync(path.dirname(dbPath), { recursive: true })
     if (!fs.existsSync(dbPath)) {
-      const init = { settings: { global: { all: false, private: false, voice: false }, chats: {} }, voiceId: '' }
+      const init = { settings: { global: { all: false, private: false, voice: false }, chats: {} }, voiceId: 'friendly-women' }
       fs.writeFileSync(dbPath, JSON.stringify(init, null, 2))
       return init
     }
     return JSON.parse(fs.readFileSync(dbPath, 'utf8'))
   } catch {
-    return { settings: { global: { all: false, private: false, voice: false }, chats: {} }, voiceId: '' }
+    return { settings: { global: { all: false, private: false, voice: false }, chats: {} }, voiceId: 'friendly-women' }
   }
 }
 function saveDb(db) {
@@ -25,10 +25,9 @@ function saveDb(db) {
 const SYSTEM = `You are Mina (Lady-Mina), a friendly WhatsApp assistant by OmegaTech. Keep replies short, helpful and witty. Stay in character as Mina.`
 
 async function chatMina(question) {
-  // Primary: Chatbot (stable)
   try {
     const url = `${API}/Chatbot?action=chat&message=${encodeURIComponent(SYSTEM + '\n\nUser: ' + question)}`
-    const res = await fetch(url, { headers: { 'User-Agent': 'Lady-Mina/1.0' }, timeout: 25000 })
+    const res = await fetch(url, { headers: { 'User-Agent': 'Lady-Mina/1.0' } })
     if (res.ok) {
       const json = await res.json()
       const reply = json?.reply || json?.result || json?.response || json?.message || json?.data?.reply
@@ -37,10 +36,9 @@ async function chatMina(question) {
   } catch (e) {
     console.error('Chatbot fail:', e.message)
   }
-  // Fallback: All-Ai
   try {
     const url = `${API}/All-Ai?action=chat&message=${encodeURIComponent(question)}`
-    const res = await fetch(url, { headers: { 'User-Agent': 'Lady-Mina/1.0' }, timeout: 25000 })
+    const res = await fetch(url, { headers: { 'User-Agent': 'Lady-Mina/1.0' } })
     if (res.ok) {
       const json = await res.json()
       let reply = json?.reply || json?.result || json?.response
@@ -55,8 +53,26 @@ async function chatMina(question) {
   return null
 }
 
-async function tts(text) {
-  // TTS currently unstable on OmegaTech; skip gracefully
+/** Nicevoice TTS: generate → poll result */
+async function nicevoiceTTS(text, voice = 'friendly-women') {
+  try {
+    const genUrl = `${API}/Nicevoice?action=generate&text=${encodeURIComponent(text.slice(0, 400))}&voice=${encodeURIComponent(voice)}`
+    const genRes = await fetch(genUrl, { headers: { 'User-Agent': 'Lady-Mina/1.0' } })
+    const gen = await genRes.json()
+    const taskSn = gen?.data?.taskSn || gen?.taskSn
+    if (!taskSn) return null
+    for (let i = 0; i < 15; i++) {
+      await new Promise(r => setTimeout(r, 2000))
+      const stRes = await fetch(`${API}/Nicevoice?action=result&taskSn=${encodeURIComponent(taskSn)}`, {
+        headers: { 'User-Agent': 'Lady-Mina/1.0' }
+      })
+      const st = await stRes.json()
+      const d = st?.data || st
+      if (d?.audioUrl && !d.pending) return d.audioUrl
+    }
+  } catch (e) {
+    console.error('Nicevoice TTS:', e.message)
+  }
   return null
 }
 
@@ -79,17 +95,16 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
     return m.reply(`✅ *Mina* is now *${enable ? 'ENABLED' : 'DISABLED'}*${target === 'chat' ? ' for this chat' : ' (' + target + ')'}.`)
   }
 
-  return m.reply(`✨ *LADY-MINA AUTO-AI*\n\n• ${usedPrefix + command} on/off\n• ${usedPrefix + command} on/off /all\n• ${usedPrefix + command} on/off /private\n• ${usedPrefix + command} on/off /voice`)
+  return m.reply(`✨ *LADY-MINA AUTO-AI*\n\n• ${usedPrefix + command} on/off\n• ${usedPrefix + command} on/off /all\n• ${usedPrefix + command} on/off /private\n• ${usedPrefix + command} on/off /voice  _(Nicevoice TTS)_`)
 }
 
 handler.before = async (m, { conn }) => {
-  // Anti-lag / anti-spam: 3s per-chat cooldown
   global._autoaiCd = global._autoaiCd || {}
   const cdKey = m.chat
   if (global._autoaiCd[cdKey] && Date.now() - global._autoaiCd[cdKey] < 3000) return
 
   if (!m.text || m.fromMe || m.isBaileys) return
-  if (/^[.#!\/]/.test(m.text.trim())) return // ignore commands
+  if (/^[.#!\/]/.test(m.text.trim())) return
 
   const db = loadDb()
   const g = db.settings.global
@@ -111,7 +126,8 @@ handler.before = async (m, { conn }) => {
     if (!clean) return
 
     if (g.voice) {
-      const audio = await tts(clean)
+      const voice = db.voiceId || 'friendly-women'
+      const audio = await nicevoiceTTS(clean, voice)
       if (audio) {
         await conn.sendMessage(m.chat, { audio: { url: audio }, mimetype: 'audio/mpeg', ptt: true }, { quoted: m })
         return
