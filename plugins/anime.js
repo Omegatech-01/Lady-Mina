@@ -1,92 +1,104 @@
-import fetch from 'node-fetch';
-import { createCanvas } from 'canvas';
+import fetch from 'node-fetch'
+
+const API = 'https://api.omegatech.app/api/Anime/Anoboy'
+
+async function apiGet(params) {
+  const url = `${API}?${new URLSearchParams(params)}`
+  const res = await fetch(url, { headers: { 'User-Agent': 'Lady-Mina/1.0' } })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json()
+}
 
 let handler = async (m, { conn, text, usedPrefix, command }) => {
-    conn.animeFlow = conn.animeFlow ? conn.animeFlow : {};
+  conn.animeFlow = conn.animeFlow || {}
 
-    // --- CASE 1: NO TEXT (Show UI Guide) ---
-    if (!text && !m.quoted) {
-        const canvas = createCanvas(800, 400);
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#020205';
-        ctx.fillRect(0, 0, 800, 400);
-        ctx.strokeStyle = '#00d2ff';
-        ctx.lineWidth = 5;
-        ctx.strokeRect(20, 20, 760, 360);
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 50px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('ANIME ENGINE', 400, 180);
-        ctx.font = '20px monospace';
-        ctx.fillStyle = '#00d2ff';
-        ctx.fillText(`Usage: ${usedPrefix + command} <name>`, 400, 240);
-        
-        return conn.sendMessage(m.chat, { image: canvas.toBuffer(), caption: `*✨ Lady-Trish Anime Search*\nExample: ${usedPrefix + command} One Piece` }, { quoted: m });
+  if (!text && !m.quoted) {
+    return m.reply(`*✨ Lady-Mina Anime Search*\n\nExample:\n${usedPrefix + command} One Piece\n\nReply with a number from the list to see details.`)
+  }
+
+  if (m.quoted && conn.animeFlow[m.sender]) {
+    const session = conn.animeFlow[m.sender]
+    const choice = parseInt(text)
+    if (isNaN(choice)) return
+
+    if (session.step === 'list') {
+      const item = session.data[choice - 1]
+      if (!item) return m.reply('❌ Invalid choice. Pick a number from the list.')
+      await m.react('⏳')
+      try {
+        const res = await apiGet({ action: 'detail', url: item.url || item.link || item.href })
+        const info = res.result || res.data || res
+        const title = info.title || info.name || item.title || 'Anime'
+        const eps = info.episodes || info.episode || []
+        let cap = `*🎬 ${title}*\n\n`
+        if (info.synopsis || info.description) cap += `📖 ${(info.synopsis || info.description || '').slice(0, 300)}...\n\n`
+        if (Array.isArray(eps) && eps.length) {
+          cap += `*EPISODES:*\n`
+          eps.slice(0, 20).forEach((ep, i) => {
+            const name = ep.title || ep.episode || ep.name || `Episode ${i + 1}`
+            cap += `${i + 1}. ${name}\n`
+          })
+          cap += `\n_Reply with episode number for download links._`
+          session.step = 'details'
+          session.episodes = eps
+        } else {
+          delete conn.animeFlow[m.sender]
+        }
+        const thumb = info.thumbnail || info.cover || info.image || item.image
+        if (thumb) return conn.sendMessage(m.chat, { image: { url: thumb }, caption: cap }, { quoted: m })
+        return m.reply(cap)
+      } catch (e) {
+        return m.reply('❌ Failed to fetch details: ' + (e.message || e))
+      }
     }
 
-    // --- CASE 2: HANDLE REPLIES (Flow Logic) ---
-    if (m.quoted && conn.animeFlow[m.sender]) {
-        let session = conn.animeFlow[m.sender];
-        let choice = parseInt(text);
-        if (isNaN(choice)) return; // Ignore if not a number
-
-        // Step 2: Getting Details
-        if (session.step === 'list') {
-            let item = session.data[choice - 1];
-            if (!item) return m.reply('❌ Invalid choice. Pick a number from the list.');
-            
-            await m.react('⏳');
-            let res = await (await fetch(`https://api.omegatech.app/api/Anime/anime-details?slug=${item.url}`)).json();
-            if (!res.status) return m.reply('❌ Details not found.');
-
-            let cap = `*🎬 ${res.info.title}*\n\n` +
-                      `⭐ Rating: ${res.info.rating}\n` +
-                      `📅 Date: ${res.info.date_published}\n` +
-                      `🎭 Genres: ${res.genres.join(', ')}\n\n` +
-                      `📖 *Synopsis:* ${res.synopsis.slice(0, 250)}...\n\n` +
-                      `*EPISODES LIST:*\n`;
-            
-            res.episodes.slice(0, 15).forEach((ep, i) => {
-                cap += `${i + 1}. Episode ${ep.title}\n`;
-            });
-            cap += `\n_Reply with episode number to get download links._`;
-
-            session.step = 'details';
-            session.episodes = res.episodes;
-            return conn.sendMessage(m.chat, { image: { url: res.info.cover }, caption: cap }, { quoted: m });
+    if (session.step === 'details') {
+      const ep = session.episodes[choice - 1]
+      if (!ep) return m.reply('❌ Invalid episode number.')
+      await m.react('📥')
+      try {
+        const res = await apiGet({ action: 'episode', url: ep.url || ep.link || ep.href })
+        const data = res.result || res.data || res
+        const links = data.downloads || data.streams || data.links || []
+        let cap = `*🚀 DOWNLOAD READY*\n\n`
+        if (Array.isArray(links) && links.length) {
+          links.forEach((s, i) => {
+            const u = s.link || s.url || s
+            const q = s.quality || s.resolusi || s.type || ''
+            cap += `🔗 *${q || `Mirror ${i + 1}`}*: ${u}\n\n`
+          })
+        } else {
+          cap += JSON.stringify(data).slice(0, 800)
         }
-
-        // Step 3: Getting Download Links
-        if (session.step === 'details') {
-            let ep = session.episodes[choice - 1];
-            if (!ep) return m.reply('❌ Invalid episode number.');
-            
-            await m.react('📥');
-            let res = await (await fetch(`https://api.omegatech.app/api/Anime/anime-download?slug=${ep.url}&quality=720p`)).json();
-            
-            let cap = `*🚀 DOWNLOAD READY*\n\n`;
-            res.streams.forEach((s, i) => cap += `🔗 *Mirror ${i+1}:* ${s.link}\n\n`);
-            
-            delete conn.animeFlow[m.sender]; // End Session
-            return m.reply(cap);
-        }
+        delete conn.animeFlow[m.sender]
+        return m.reply(cap)
+      } catch (e) {
+        return m.reply('❌ Failed to fetch episode: ' + (e.message || e))
+      }
     }
+  }
 
-    // --- CASE 3: NEW SEARCH ---
-    await m.react('🔍');
-    let res = await (await fetch(`https://api.omegatech.app/api/Anime/anime-search?query=${encodeURIComponent(text)}`)).json();
-    if (!res.success || res.results.result.length === 0) return m.reply('❌ Anime not found.');
+  await m.react('🔍')
+  try {
+    const res = await apiGet({ action: 'search', query: text })
+    const results = res.results || res.result || res.data || []
+    const list = Array.isArray(results) ? results : (results.result || [])
+    if (!list.length) return m.reply('❌ Anime not found.')
 
-    let results = res.results.result.slice(0, 10);
-    let list = `*🔍 SEARCH RESULTS:* "${text}"\n\n`;
-    results.forEach((v, i) => list += `*${i + 1}.* ${v.judul}\n`);
-    list += `\n_Reply with a number to see details._`;
+    const top = list.slice(0, 10)
+    let msg = `*🔍 SEARCH RESULTS:* "${text}"\n\n`
+    top.forEach((v, i) => {
+      msg += `*${i + 1}.* ${v.title || v.judul || v.name || 'Untitled'}\n`
+    })
+    msg += `\n_Reply with a number to see details._`
+    conn.animeFlow[m.sender] = { step: 'list', data: top }
+    return m.reply(msg)
+  } catch (e) {
+    return m.reply('❌ Search failed: ' + (e.message || e))
+  }
+}
 
-    conn.animeFlow[m.sender] = { step: 'list', data: results };
-    return m.reply(list);
-};
-
-handler.help = ['anime'];
-handler.tags = ['anime'];
-handler.command = /^(anime)$/i;
-export default handler;
+handler.help = ['anime']
+handler.tags = ['anime']
+handler.command = /^(anime)$/i
+export default handler
