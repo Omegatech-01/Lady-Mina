@@ -19,7 +19,7 @@ global.autoGcppJobs = global.autoGcppJobs || {}
 
 async function getImageBuffer(type) {
   try {
-    const api = `https://omegatech-api.dixonomega.tech/api/tools/wallpaper?name=${encodeURIComponent(type)}`
+    const api = `https://api.omegatech.app/api/tools/wallpaper?name=${encodeURIComponent(type)}`
     const res = await axios.get(api, { timeout: 15000 })
     if (!res.data?.results?.length) return null
     const pick = res.data.results[Math.floor(Math.random() * res.data.results.length)]
