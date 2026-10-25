@@ -10,20 +10,53 @@ async function safeFetch(url) {
   return res.json()
 }
 
-let handler = async (m, { conn, text, usedPrefix, command }) => {
-  if (!text) return m.reply(`Example: ${usedPrefix + command} a cat in space`)
-  await m.reply('_Generating with Sora..._')
+let handler = async (m, { conn, text }) => {
+  if (!text) return m.reply('Type a prompt for Sora2 to animate.')
+
+  m.reply('🎬 Generating video… patience is a virtue.')
+
+  // 1️⃣ Create task
+  let create
   try {
-    const data = await safeFetch(`${API}/sora?prompt=${encodeURIComponent(text)}`)
-    const url = data?.result || data?.url || data?.video
-    if (!url) return m.reply('No result from API.')
-    await conn.sendMessage(m.chat, { video: { url }, caption: `🎬 *Sora*\n${text}` }, { quoted: m })
+    create = await safeFetch(
+      `${API}/Sora2-createv2?prompt=${encodeURIComponent(text)}&ratio=9:16`
+    )
   } catch (e) {
-    m.reply('Error: ' + (e.message || e))
+    console.error(e)
+    return m.reply('❌ Failed to start generation.')
   }
+
+  if (!create?.id) return m.reply('❌ No task id returned.')
+
+  // 2️⃣ Poll status
+  let result = null
+  for (let i = 0; i < 30; i++) {
+    await new Promise(r => setTimeout(r, 5000))
+    try {
+      const st = await safeFetch(`${API}/Sora2-statusv2?id=${create.id}`)
+      if (st?.status === 'completed' || st?.video || st?.url) {
+        result = st
+        break
+      }
+      if (st?.status === 'failed') return m.reply('❌ Generation failed.')
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  if (!result) return m.reply('⌛ Timed out waiting for video.')
+
+  const url = result.video || result.url || result.result
+  if (!url) return m.reply('❌ No video URL in response.')
+
+  await conn.sendMessage(m.chat, {
+    video: { url },
+    caption: `🎬 *Sora2*\n${text}`
+  }, { quoted: m })
 }
+
 handler.help = ['sora2']
 handler.tags = ['ai']
-handler.command = /^(sora2|sora)$/i
+handler.command = /^(sora2)$/i
 handler.limit = true
 export default handler
