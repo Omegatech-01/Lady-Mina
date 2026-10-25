@@ -64,7 +64,7 @@ const handler = async (m, { conn, usedPrefix: _p, isOwner }) => {
 
 	/* ---------- MENU TEXT ---------- */
 	let text = `
-┏━━〔  ${style('Lady-Trish')}  〕━━┓
+┏━━〔  ${style('Lady-Mina')}  〕━━┓
 ┃ ⚡ ${greeting()}
 ┃ 👤 User: ${user.name || conn.getName(m.sender)}
 ┃ 🧬 Role: ${user.role}
@@ -91,9 +91,9 @@ const handler = async (m, { conn, usedPrefix: _p, isOwner }) => {
 	await conn.sendMessage(
 		m.chat,
 		{
-			document: Buffer.from('Lady-Trish System Interface'),
+			document: Buffer.from('Lady-Mina System Interface'),
 			mimetype: 'application/pdf',
-			fileName: 'Lady-Trish_Menu.pdf',
+			fileName: 'Lady-Mina_Menu.pdf',
 			fileLength: 999999999,
 			pageCount: 2026,
 			caption: style(text),
@@ -101,7 +101,7 @@ const handler = async (m, { conn, usedPrefix: _p, isOwner }) => {
 				forwardingScore: 999,
 				isForwarded: true,
 				externalAdReply: {
-					title: 'Lady-Trish WhatsApp Bot',
+					title: 'Lady-Mina WhatsApp Bot',
 					body: 'System Online • Stable Channel',
 					thumbnailUrl: thumbUrl,
 					sourceUrl: global.source || 'https://wa.me/23278025474',
@@ -111,7 +111,7 @@ const handler = async (m, { conn, usedPrefix: _p, isOwner }) => {
 				forwardedNewsletterMessageInfo: {
 					newsletterJid: '120363403299118246@newsletter',
 					serverMessageId: 142,
-					newsletterName: 'Lady-Trish Channel'
+					newsletterName: 'Lady-Mina Channel'
 				}
 			}
 		},
