@@ -35,7 +35,7 @@ global.config = {
         "120363382653504904@g.us"  // Updated channel ID
     ],
     newsletter: '120363382653504904@newsletter',
-    website: 'https://dixonomega.tech',
+    website: 'https://api.omegatech.app',
     group: 'https://chat.whatsapp.com/FiGcVHByvd28Z1sT1OxWIY',
     logo: "https://",
     /*============= PAIRING =============*/
@@ -46,9 +46,10 @@ global.config = {
     pairingAuth: true, // true = pair with code; false = show QR in terminal
     /*============== API ==============*/
     APIs: {
+        omega: 'https://api.omegatech.app',
         lol: 'https://api.lolhuman.xyz',
         btz: 'https://api.betabotz.eu.org',
-    }, //In Here Go to these web and get a api key//
+    },
     APIKeys: {
         'https://api.lolhuman.xyz': 'e63e81d8295848763427d6bc',
         'https://api.betabotz.eu.org': 'Btz-C3BRV'
